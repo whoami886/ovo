@@ -71,4 +71,4 @@ jobs:
         if: always()
         with:
           name: ovo-ko
-          path: $GITHUB_WORKSPACE/art/
+          path: art/
