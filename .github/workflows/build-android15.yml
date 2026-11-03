@@ -1,6 +1,10 @@
 name: Build ovo.ko
 
 on:
+  push:
+    paths:
+      - '.github/workflows/**'
+      - 'ovo/**'
   workflow_dispatch:
 
 jobs:
@@ -45,7 +49,7 @@ jobs:
           make O=$OUT gki_defconfig
           make O=$OUT prepare
           make O=$OUT modules_prepare
-          make O=$OUT M=$GITHUB_WORKSPACE/ovo modules -j$(nproc)
+          make O=$OUT M=$GITHUB_WORKSPACE/ovo/ovo modules -j$(nproc)
           echo "=== ko files ==="
           find $GITHUB_WORKSPACE -name "*.ko" -ls
 
