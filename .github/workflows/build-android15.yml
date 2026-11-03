@@ -49,7 +49,12 @@ jobs:
           make O=$OUT gki_defconfig
           make O=$OUT prepare
           make O=$OUT modules_prepare
-          make O=$OUT M=$GITHUB_WORKSPACE/ovo/ovo modules -j$(nproc)
+          echo "GITHUB_WORKSPACE=$GITHUB_WORKSPACE"
+          ls -la "$GITHUB_WORKSPACE" | head -20
+          MODDIR=$(dirname "$(find "$GITHUB_WORKSPACE" -maxdepth 3 -type f -name Makefile | grep -v '/k/' | head -1)")
+          echo "MODDIR=$MODDIR"
+          ls -la "$MODDIR"
+          make O=$OUT M="$MODDIR" modules -j$(nproc)
           echo "=== ko files ==="
           find $GITHUB_WORKSPACE -name "*.ko" -ls
 
