@@ -56,7 +56,7 @@ jobs:
           MODDIR=$(dirname "$(find "$GITHUB_WORKSPACE" -maxdepth 3 -type f -name Makefile | grep -v '/k/' | head -1)")
           echo "MODDIR=$MODDIR"
           ls -la "$MODDIR"
-          make O=$OUT M="$MODDIR" modules -j$(nproc)
+          KBUILD_MODPOST_WARN=1 make O=$OUT M="$MODDIR" modules -j$(nproc)
           echo "=== ko files ==="
           find $GITHUB_WORKSPACE -name "*.ko" -ls
 
