@@ -19,7 +19,7 @@ jobs:
           - version: 6.6.120
             tag: android15-6.6
             patch-level: 2026-10
-          
+            arch: aarch64
     steps:
       - name: Maximize build space
         uses: easimon/maximize-build-space@master
@@ -46,13 +46,28 @@ jobs:
           module-name: ovo
           module-path: ovo
 
+      - name: Collect KO files
+        if: always()
+        run: |
+          mkdir -p out
+          find . -name "*.ko" -type f 2>/dev/null | head -50 || true
+          find . -name "*.ko" -type f -exec cp {} out/ \; 2>/dev/null || true
+          ls -l out || true
+
+      - name: Upload KO
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ovo-ko
+          path: out/
+          if-no-files-found: warn
+
   upload-artifact:
     name: Upload LKM Source Code
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
-
       - name: Upload LKM Source Code
         uses: actions/upload-artifact@v4
         with:
