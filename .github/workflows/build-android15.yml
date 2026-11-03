@@ -18,7 +18,7 @@ jobs:
         include:
           - version: 6.6.120
             tag: android15-6.6
-            patch-level: 2026-10
+            patch-level: 2025-09
             arch: aarch64
     steps:
       - name: Maximize build space
