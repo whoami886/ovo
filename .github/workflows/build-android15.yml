@@ -1,27 +1,15 @@
-name: Android15 Kernel Module Build
+name: Build ovo.ko
 
 on:
   workflow_dispatch:
 
 jobs:
   build:
-    name: GKI Kernel Module Build
     runs-on: ubuntu-latest
-    needs: upload-artifact
-    env:
-      CCACHE_COMPILERCHECK: "%compiler% -dumpmachine; %compiler% -dumpversion"
-      CCACHE_NOHASHDIR: "true"
-      CCACHE_HARDLINK: "true"
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - version: 6.6.120
-            tag: android15-6.6
-            patch-level: 2025-09
-            arch: aarch64
     steps:
-      - name: Maximize build space
+      - uses: actions/checkout@v4
+
+      - name: Free disk
         uses: easimon/maximize-build-space@master
         with:
           root-reserve-mb: 8192
@@ -32,44 +20,44 @@ jobs:
           remove-codeql: 'true'
           remove-docker-images: 'true'
 
-      - name: Checkout Repository
-        uses: actions/checkout@v4
+      - name: Install deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y repo git curl bc bison flex libelf-dev libssl-dev \
+            python3 rsync make clang lld llvm
+          clang --version
 
-      - name: Run GKI Kernel Build Action
-        uses: ./
-        with:
-          arch: ${{ matrix.arch }}
-          tag: ${{ matrix.tag }}-${{ matrix.patch-level }}
-          simple-tag: ${{ matrix.tag }}
-          version: ${{ matrix.version }}
-          fast_build: false
-          module-name: ovo
-          module-path: ovo
+      - name: Sync kernel source
+        run: |
+          mkdir -p $GITHUB_WORKSPACE/k && cd $GITHUB_WORKSPACE/k
+          repo init --depth=1 -u https://android.googlesource.com/kernel/manifest \
+            -b common-android15-6.6-2025-09 --repo-rev=v2.16
+          repo sync -c -j$(nproc) --no-tags
+          echo "=== check abi file ==="
+          ls -l common/android/abi_gki_protected_exports_aarch64 || echo "MISSING"
 
-      - name: Collect KO files
+      - name: Build ovo.ko
+        run: |
+          OUT=$GITHUB_WORKSPACE/k/out
+          cd $GITHUB_WORKSPACE/k/common
+          export ARCH=arm64
+          export LLVM=1
+          make O=$OUT gki_defconfig
+          make O=$OUT prepare
+          make O=$OUT modules_prepare
+          make O=$OUT M=$GITHUB_WORKSPACE/ovo modules -j$(nproc)
+          echo "=== ko files ==="
+          find $GITHUB_WORKSPACE -name "*.ko" -ls
+
+      - name: Collect
         if: always()
         run: |
-          mkdir -p out
-          find . -name "*.ko" -type f 2>/dev/null | head -50 || true
-          find . -name "*.ko" -type f -exec cp {} out/ \; 2>/dev/null || true
-          ls -l out || true
+          mkdir -p $GITHUB_WORKSPACE/art
+          find $GITHUB_WORKSPACE -name "*.ko" -exec cp {} $GITHUB_WORKSPACE/art/ \; || true
+          ls -l $GITHUB_WORKSPACE/art
 
-      - name: Upload KO
+      - uses: actions/upload-artifact@v4
         if: always()
-        uses: actions/upload-artifact@v4
         with:
           name: ovo-ko
-          path: out/
-          if-no-files-found: warn
-
-  upload-artifact:
-    name: Upload LKM Source Code
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4
-      - name: Upload LKM Source Code
-        uses: actions/upload-artifact@v4
-        with:
-          name: ovo
-          path: ovo
+          path: $GITHUB_WORKSPACE/art/
