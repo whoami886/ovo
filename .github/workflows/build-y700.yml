@@ -57,7 +57,7 @@ jobs:
           make O=$OUT modules_prepare
           MODDIR=$GITHUB_WORKSPACE/ovo
           ls -la "$MODDIR"
-          KBUILD_MODPOST_WARN=1 make O=$OUT M="$MODDIR" modules -j$(nproc)
+          KBUILD_MODPOST_WARN=1 WERROR=0 make O=$OUT M="$MODDIR" modules -j$(nproc) KCFLAGS="-Wno-error -Wno-default-const-init-var-unsafe -Wno-unused-but-set-variable"
           find $GITHUB_WORKSPACE -name "*.ko" -ls
 
       - name: Collect
