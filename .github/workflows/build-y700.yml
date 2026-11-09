@@ -1,0 +1,79 @@
+name: Build ovo.ko (multi-kernel for Y700)
+
+on:
+  push:
+    paths:
+      - '.github/workflows/build-y700.yml'
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - branch: android15-6.6-2024-07_r1
+            label: k6630
+          - branch: android15-6.6-2024-12_r1
+            label: k6657
+          - branch: android15-6.6-2025-03_r1
+            label: k66new
+    steps:
+      - name: Free disk
+        uses: easimon/maximize-build-space@master
+        with:
+          root-reserve-mb: 8192
+          temp-reserve-mb: 2048
+          remove-dotnet: 'true'
+          remove-android: 'true'
+          remove-haskell: 'true'
+          remove-codeql: 'true'
+          remove-docker-images: 'true'
+
+      - uses: actions/checkout@v4
+
+      - name: Install deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y git make bc bison flex libelf-dev libssl-dev \
+            python3 rsync clang lld llvm
+          clang --version
+
+      - name: Clone kernel ${{ matrix.branch }}
+        run: |
+          git clone --depth 1 --branch ${{ matrix.branch }} \
+            https://android.googlesource.com/kernel/common k/common
+          head -4 k/common/Makefile
+
+      - name: Build ovo.ko
+        run: |
+          OUT=$GITHUB_WORKSPACE/k/out
+          cd $GITHUB_WORKSPACE/k/common
+          export ARCH=arm64
+          export LLVM=1
+          make O=$OUT gki_defconfig
+          make O=$OUT prepare
+          make O=$OUT modules_prepare
+          MODDIR=$GITHUB_WORKSPACE/ovo
+          ls -la "$MODDIR"
+          KBUILD_MODPOST_WARN=1 make O=$OUT M="$MODDIR" modules -j$(nproc)
+          find $GITHUB_WORKSPACE -name "*.ko" -ls
+
+      - name: Collect
+        if: always()
+        run: |
+          mkdir -p art
+          find $GITHUB_WORKSPACE -name "*.ko" -exec cp {} art/ \; || true
+          for f in art/*.ko; do
+            [ -f "$f" ] || continue
+            strings -a "$f" | grep -m1 vermagic || true
+          done
+          ls -l art
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ovo-ko-${{ matrix.label }}
+          path: art/
+          if-no-files-found: warn
